@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -34,9 +36,50 @@ jobs:
       - name: Build firmware
         run: pio run
 
-      - name: Upload firmware artifact
+      - name: Build LittleFS filesystem
+        run: pio run --target buildfs
+
+      - name: Collect all flash files
+        run: |
+          BUILD=.pio/build/esp32dev
+          mkdir -p flash_files
+          cp $BUILD/firmware.bin        flash_files/firmware.bin
+          cp $BUILD/bootloader.bin      flash_files/bootloader.bin
+          cp $BUILD/partitions.bin      flash_files/partitions.bin
+          cp $BUILD/littlefs.bin        flash_files/littlefs.bin
+
+      - name: Upload all flash files as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: firmware
-          path: .pio/build/esp32dev/firmware.bin
+          name: flash-files
+          path: flash_files/
           retention-days: 30
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "Build #${{ github.run_number }}"
+          body: |
+            Automatic build from commit ${{ github.sha }}
+
+            ## Flash Files
+            | File | Description |
+            |------|-------------|
+            | `bootloader.bin` | Bootloader (offset 0x1000) |
+            | `partitions.bin` | Partition table (offset 0x8000) |
+            | `firmware.bin` | Main application (offset 0x10000) |
+            | `littlefs.bin` | Web UI / data files (offset 0x290000) |
+
+            ## Flash Command
+            ```
+            esptool.py --chip esp32 --baud 921600 write_flash \
+              0x1000  bootloader.bin \
+              0x8000  partitions.bin \
+              0x10000 firmware.bin \
+              0x290000 littlefs.bin
+            ```
+          files: flash_files/*
+          draft: false
+          prerelease: false
