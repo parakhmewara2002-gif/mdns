@@ -140,10 +140,10 @@ void setup() {
 
     // ── AC Non-Contact Detector ───────────────────────────────
     acDetector.onAcDetected = []() {
-        webUI.broadcastMessage("{\"event\":\"ac_detected\"}");
+        webUI.broadcastRaw("{\"event\":\"ac_detected\"}");
     };
     acDetector.onAcLost = []() {
-        webUI.broadcastMessage("{\"event\":\"ac_lost\"}");
+        webUI.broadcastRaw("{\"event\":\"ac_lost\"}");
     };
     acDetector.begin();
 
